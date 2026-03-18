@@ -9,5 +9,4 @@ pycache/
 .env
 .idea
 
-# Data
 data/raw/
