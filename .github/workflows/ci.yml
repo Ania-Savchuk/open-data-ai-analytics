@@ -35,17 +35,17 @@ jobs:
           - module: data_research
             path: src/data_research.ipynb
             kind: notebook
-            command: "jupyter nbconvert --execute src/data_research.ipynb --to html --output artifacts/research.html"
+            command: "jupyter nbconvert --execute src/data_research.ipynb --to html --output research.html --output-dir artifacts"
 
           - module: data_quality_analysis
             path: notebooks/data_quality_analysis.ipynb
             kind: notebook
-            command: "jupyter nbconvert --execute notebooks/data_quality_analysis.ipynb --to html --output artifacts/quality.html"
+            command: "jupyter nbconvert --execute notebooks/data_quality_analysis.ipynb --to html --output quality.html --output-dir artifacts"
 
           - module: visualization
             path: notebooks/visualization.ipynb
             kind: notebook
-            command: "jupyter nbconvert --execute notebooks/visualization.ipynb --to html --output artifacts/visualization.html"
+            command: "jupyter nbconvert --execute notebooks/visualization.ipynb --to html --output visualization.html --output-dir artifacts"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
