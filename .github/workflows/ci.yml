@@ -1,0 +1,141 @@
+name: CI per module
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Which module to run"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - data_load
+          - data_quality_analysis
+          - data_research
+          - visualization
+jobs:
+  ci:
+    name: CI • ${{ matrix.module }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: data_load
+            path: src/load_data.py
+            kind: python
+            command: "python src/load_data.py"
+
+          - module: data_research
+            path: src/data_research.ipynb
+            kind: notebook
+            command: "jupyter nbconvert --execute src/data_research.ipynb --to html --output artifacts/research.html"
+
+          - module: data_quality_analysis
+            path: notebooks/data_quality_analysis.ipynb
+            kind: notebook
+            command: "jupyter nbconvert --execute notebooks/data_quality_analysis.ipynb --to html --output artifacts/quality.html"
+
+          - module: visualization
+            path: notebooks/visualization.ipynb
+            kind: notebook
+            command: "jupyter nbconvert --execute notebooks/visualization.ipynb --to html --output artifacts/visualization.html"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Decide whether to run this module (bonus: skip if not touched)"
+        id: decide
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MOD="${{ matrix.module }}"
+          TARGET="${{ matrix.path }}"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            CHOICE="${{ inputs.module }}"
+            if [[ "$CHOICE" == "all" || "$CHOICE" == "$MOD" ]]; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD" || true)"
+
+          SHARED_REGEX='^(requirements\.txt|pyproject\.toml|poetry\.lock|setup\.cfg|setup\.py|Makefile|\.github/workflows/)'
+
+          RUN=false
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            if [[ "$f" =~ $SHARED_REGEX ]]; then
+              RUN=true
+              break
+            fi
+            if [[ "$f" == "$TARGET" || "$TARGET" == "$f" ]]; then
+              RUN=true
+              break
+            fi
+            TOPDIR="${TARGET%%/*}"
+            if [[ "$f" == "$TOPDIR/"* ]]; then
+              RUN=true
+              break
+            fi
+          done <<< "$CHANGED"
+
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Python
+        if: steps.decide.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.decide.outputs.run == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install jupyter nbconvert
+
+      - name: Create artifacts dir
+        if: steps.decide.outputs.run == 'true'
+        run: mkdir -p artifacts
+
+      - name: Run module check
+        if: steps.decide.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Running: ${{ matrix.command }}" | tee "artifacts/${{ matrix.module }}.log"
+          ( ${{ matrix.command }} ) 2>&1 | tee -a "artifacts/${{ matrix.module }}.log"
+
+          echo "module,status" > "artifacts/${{ matrix.module }}.csv"
+          echo "${{ matrix.module }},ok" >> "artifacts/${{ matrix.module }}.csv"
+
+      - name: Upload artifacts
+        if: steps.decide.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.module }}
+          path: artifacts/
+          if-no-files-found: error
