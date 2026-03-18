@@ -6,7 +6,12 @@ from pathlib import Path
 
 DATA_URL = "https://data.gov.ua/dataset/0ffd8b75-0628-48cc-952a-9302f9799ec0/resource/3f13166f-090b-499e-8e23-e9851c5a5f67/download/reestrtz2026.zip"
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+if SCRIPT_DIR.name == "src":
+    PROJECT_ROOT = SCRIPT_DIR.parent
+else:
+    PROJECT_ROOT = Path.cwd()
+
 OUTPUT_DIR = PROJECT_ROOT / "data" / "raw"
 FINAL_CSV_NAME = "vehicle_registrations.csv"
 
