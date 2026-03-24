@@ -20,12 +20,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        # На self-hosted краще явно вказувати шлях або використовувати setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12' # Міняємо на стабільну 3.12, як ми обговорювали
-
       - name: Install dependencies
         shell: powershell
         run: | 
