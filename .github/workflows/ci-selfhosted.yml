@@ -20,28 +20,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Windows PowerShell)
+      - name: Set up Python
+        # На self-hosted краще явно вказувати шлях або використовувати setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12' # Міняємо на стабільну 3.12, як ми обговорювали
+
+      - name: Install dependencies
         shell: powershell
         run: | 
           python -m pip install --upgrade pip 
-          if (Test-Path requirements.txt) { pip install -r requirements.txt } 
-          pip install jupyter nbconvert 
+          if (Test-Path requirements.txt) { 
+            pip install -r requirements.txt 
+          } 
+          pip install jupyter nbconvert
 
       - name: Create artifacts dir
         shell: powershell
         run: | 
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null 
+          if (!(Test-Path artifacts)) {
+            New-Item -ItemType Directory -Path artifacts
+          }
 
       - name: Run selected module
         shell: powershell
         run: | 
           if ("${{ inputs.module }}" -eq "data") { 
+            # Додаємо вивід у файл та на екран одночасно
             python src\load_data.py | Tee-Object -FilePath artifacts\selfhosted.log 
           } 
           else { 
-            jupyter nbconvert --execute notebooks\visualization.ipynb --to html ` 
-              --output visualization-selfhosted.html --output-dir artifacts ` 
-              | Tee-Object -FilePath artifacts\selfhosted.log 
+            # ПИШЕМО ВСЕ В ОДИН РЯДОК, щоб уникнути проблем із переносом у PowerShell
+            jupyter nbconvert --execute notebooks\visualization.ipynb --to html --output visualization-selfhosted.html --output-dir artifacts | Tee-Object -FilePath artifacts\selfhosted.log
           } 
 
       - name: Upload artifacts
